@@ -7,6 +7,10 @@ type Booking = {
     check_in: string
     check_out: string
     status: string
+    guests: number
+    special_request: string | null
+    total_price: string | number
+    paid: number | boolean
     user_name: string
     user_email: string
     room_number: string
@@ -189,7 +193,8 @@ export default function AdminView() {
                             <thead>
                             <tr className="border-b">
                                 <th className="p-2">ID</th><th className="p-2">Guest</th><th className="p-2">Room</th>
-                                <th className="p-2">Check-in</th><th className="p-2">Check-out</th><th className="p-2">Status</th><th className="p-2"></th>
+                                <th className="p-2">Check-in</th><th className="p-2">Check-out</th><th className="p-2">Status</th>
+                                <th className="p-2">Guests</th><th className="p-2">Total</th><th className="p-2">Paid</th><th className="p-2">Request</th><th className="p-2"></th>
                             </tr>
                             </thead>
                             <tbody>
@@ -201,6 +206,10 @@ export default function AdminView() {
                                     <td className="p-2">{b.check_in}</td>
                                     <td className="p-2">{b.check_out}</td>
                                     <td className="p-2">{b.status}</td>
+                                    <td className="p-2">{b.guests}</td>
+                                    <td className="p-2">{Number(b.total_price).toFixed(2)}</td>
+                                    <td className="p-2">{b.paid ? 'Yes' : 'No'}</td>
+                                    <td className="p-2">{b.special_request}</td>
                                     <td className="p-2 text-right">
                                         {b.status === 'confirmed' && (
                                             <button className="text-red-600 underline" onClick={() => cancelBooking(b)}>Cancel</button>

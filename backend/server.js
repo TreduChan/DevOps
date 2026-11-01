@@ -235,14 +235,48 @@ app.get('/api/rooms', requireAuth, async (req, res) => {
   }
 });
 
+// Availability info for one room: its open window and the dates already booked
+app.get('/api/rooms/:id/availability', requireAuth, async (req, res) => {
+  try {
+    const [rooms] = await pool.execute(
+      'SELECT available_from, available_until FROM rooms WHERE id = ?',
+      [req.params.id]
+    );
+    if (rooms.length === 0) return res.status(404).json({ error: 'Room not found' });
+
+    const [booked] = await pool.execute(
+      `SELECT check_in, check_out FROM bookings
+       WHERE room_id = ? AND status = 'confirmed' AND check_out >= CURDATE()
+       ORDER BY check_in`,
+      [req.params.id]
+    );
+    return res.json({
+      available_from: rooms[0].available_from,
+      available_until: rooms[0].available_until,
+      booked,
+    });
+  } catch (error) {
+    console.error('Availability failed:', error.message);
+    return res.status(500).json({ error: 'Could not load availability' });
+  }
+});
+
 // ---------- bookings ----------
 app.post('/api/bookings', requireAuth, async (req, res) => {
-  const { room_id, check_in, check_out } = req.body || {};
+  const { room_id, check_in, check_out, guests, special_request, pay_now } = req.body || {};
   const roomId = Number(room_id);
+  const guestCount = Number(guests);
+  const request = typeof special_request === 'string' ? special_request.trim() : '';
   const today = new Date().toISOString().slice(0, 10);
 
   if (!Number.isInteger(roomId) || !validDate(check_in) || !validDate(check_out) || check_out <= check_in) {
-    return res.status(400).json({ error: 'room_id and valid dates are required (check-out after check-in)' });
+    return res.status(400).json({ error: 'Choose valid dates (check-out after check-in)' });
+  }
+  if (!Number.isInteger(guestCount) || guestCount < 1) {
+    return res.status(400).json({ error: 'Number of guests must be 1 or more' });
+  }
+  if (request.length > 200) {
+    return res.status(400).json({ error: 'Special request can be at most 200 characters' });
   }
   if (check_in < today) return res.status(400).json({ error: 'Check-in cannot be in the past' });
 
@@ -251,7 +285,7 @@ app.post('/api/bookings', requireAuth, async (req, res) => {
     await conn.beginTransaction();
     // Lock the room row so two people cannot book the same room at the same moment
     const [rooms] = await conn.execute(
-      'SELECT id, available_from, available_until FROM rooms WHERE id = ? FOR UPDATE',
+      'SELECT id, capacity, price_per_night, available_from, available_until FROM rooms WHERE id = ? FOR UPDATE',
       [roomId]
     );
     if (rooms.length === 0) {
@@ -259,6 +293,10 @@ app.post('/api/bookings', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Room not found' });
     }
     const room = rooms[0];
+    if (guestCount > room.capacity) {
+      await conn.rollback();
+      return res.status(400).json({ error: `This room fits at most ${room.capacity} guests` });
+    }
     if (
       (room.available_from && check_in < room.available_from) ||
       (room.available_until && check_out > room.available_until)
@@ -274,12 +312,20 @@ app.post('/api/bookings', requireAuth, async (req, res) => {
       await conn.rollback();
       return res.status(409).json({ error: 'Room is not available for those dates' });
     }
+    const nights = Math.round((Date.parse(check_out) - Date.parse(check_in)) / 86400000);
+    const total = Math.round(nights * Number(room.price_per_night) * 100) / 100;
+    const paid = pay_now === true ? 1 : 0;
+
     const [result] = await conn.execute(
-      'INSERT INTO bookings (user_id, room_id, check_in, check_out) VALUES (?, ?, ?, ?)',
-      [req.user.id, roomId, check_in, check_out]
+      `INSERT INTO bookings (user_id, room_id, check_in, check_out, guests, special_request, total_price, paid)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.user.id, roomId, check_in, check_out, guestCount, request || null, total, paid]
     );
     await conn.commit();
-    return res.status(201).json({ id: result.insertId, room_id: roomId, check_in, check_out, status: 'confirmed' });
+    return res.status(201).json({
+      id: result.insertId, room_id: roomId, check_in, check_out,
+      guests: guestCount, total_price: total, paid: paid === 1, status: 'confirmed',
+    });
   } catch (error) {
     await conn.rollback().catch(() => {});
     console.error('Booking failed:', error.message);
@@ -291,21 +337,23 @@ app.post('/api/bookings', requireAuth, async (req, res) => {
 
 // My reservations
 app.get('/api/bookings/mine', requireAuth, async (req, res) => {
-  try {
-    const [rows] = await pool.execute(
-      `SELECT b.id, b.check_in, b.check_out, b.status, r.room_number, r.type, r.price_per_night
-       FROM bookings b JOIN rooms r ON r.id = b.room_id
-       WHERE b.user_id = ? ORDER BY b.check_in DESC`,
-      [req.user.id]
-    );
-    return res.json(rows);
-  } catch (error) {
-    console.error('My bookings failed:', error.message);
-    return res.status(500).json({ error: 'Could not load reservations' });
-  }
+    try {
+      const [rows] = await pool.execute(
+        `SELECT b.id, b.check_in, b.check_out, b.status, b.guests, b.special_request, b.total_price, b.paid,
+                r.room_number, r.type
+         FROM bookings b JOIN rooms r ON r.id = b.room_id
+         WHERE b.user_id = ? AND b.status = 'confirmed'
+         ORDER BY b.check_in DESC`,
+        [req.user.id]
+      );
+      return res.json(rows);
+    } catch (error) {
+      console.error('My bookings failed:', error.message);
+      return res.status(500).json({ error: 'Could not load reservations' });
+    }
 });
 
-// Cancel: the owner or an admin
+// Cancel = remove the booking. Allowed for the owner or an admin
 app.patch('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
   try {
     const [rows] = await pool.execute('SELECT id, user_id FROM bookings WHERE id = ?', [req.params.id]);
@@ -314,8 +362,8 @@ app.patch('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
     if (booking.user_id !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Not your booking' });
     }
-    await pool.execute("UPDATE bookings SET status = 'cancelled' WHERE id = ?", [booking.id]);
-    return res.json({ id: booking.id, status: 'cancelled' });
+    await pool.execute('DELETE FROM bookings WHERE id = ?', [booking.id]);
+    return res.json({ id: booking.id, cancelled: true });
   } catch (error) {
     console.error('Cancel failed:', error.message);
     return res.status(500).json({ error: 'Could not cancel the booking' });
@@ -326,7 +374,7 @@ app.patch('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
 app.get('/api/admin/bookings', requireAuth, requireAdmin, async (req, res) => {
   try {
     const [rows] = await pool.execute(`
-      SELECT b.id, b.check_in, b.check_out, b.status,
+      SELECT b.id, b.check_in, b.check_out, b.status, b.guests, b.special_request, b.total_price, b.paid,
              u.name AS user_name, u.email AS user_email,
              r.room_number
       FROM bookings b
