@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../AuthContext'
 import { api, type Room } from '../api'
+import BookingDialog from '../components/BookingDialog'
 
 type Reservation = {
     id: number
     check_in: string
     check_out: string
     status: string
+    guests: number
+    special_request: string | null
+    total_price: string | number
+    paid: number | boolean
     room_number: string
     type: string
-    price_per_night: string | number
 }
 
 type Search = { check_in: string; check_out: string; guests: string; type: string }
@@ -22,6 +26,7 @@ export default function BookingView() {
     const [search, setSearch] = useState<Search>({ check_in: '', check_out: '', guests: '', type: '' })
     const [rooms, setRooms] = useState<Room[]>([])
     const [reservations, setReservations] = useState<Reservation[]>([])
+    const [bookingRoom, setBookingRoom] = useState<Room | null>(null)
     const [error, setError] = useState('')
     const [message, setMessage] = useState('')
 
@@ -53,25 +58,6 @@ export default function BookingView() {
         setMessage('')
         try {
             await loadRooms(search)
-        } catch (err) {
-            setError((err as Error).message)
-        }
-    }
-
-    const book = async (room: Room) => {
-        setError('')
-        setMessage('')
-        if (!search.check_in || !search.check_out) {
-            setError('Choose check-in and check-out dates first')
-            return
-        }
-        try {
-            await api('/api/bookings', token, {
-                method: 'POST',
-                body: { room_id: room.id, check_in: search.check_in, check_out: search.check_out },
-            })
-            setMessage(`Room ${room.room_number} booked`)
-            await Promise.all([loadReservations(), loadRooms(search)])
         } catch (err) {
             setError((err as Error).message)
         }
@@ -127,7 +113,7 @@ export default function BookingView() {
 
             <section className="space-y-3">
                 <h2 className="text-lg font-semibold">
-                    {search.check_in && search.check_out ? 'Available rooms' : 'All rooms (choose dates to see availability)'}
+                    {search.check_in && search.check_out ? 'Available rooms' : 'All rooms'}
                 </h2>
                 {rooms.length === 0 && <p className="text-gray-500">No rooms found.</p>}
                 {rooms.map((r) => (
@@ -139,7 +125,16 @@ export default function BookingView() {
                                 {r.description ? `, ${r.description}` : ''}
                             </p>
                         </div>
-                        <button className="rounded bg-blue-600 px-4 py-2 text-white" onClick={() => book(r)}>Book</button>
+                        <button
+                            className="rounded bg-blue-600 px-4 py-2 text-white"
+                            onClick={() => {
+                                setError('')
+                                setMessage('')
+                                setBookingRoom(r)
+                            }}
+                        >
+                            Book
+                        </button>
                     </div>
                 ))}
             </section>
@@ -153,8 +148,9 @@ export default function BookingView() {
                         <table className="w-full text-left text-sm">
                             <thead>
                             <tr className="border-b">
-                                <th className="p-2">Room</th><th className="p-2">Check-in</th>
-                                <th className="p-2">Check-out</th><th className="p-2">Status</th><th className="p-2"></th>
+                                <th className="p-2">Room</th><th className="p-2">Check-in</th><th className="p-2">Check-out</th>
+                                <th className="p-2">Guests</th><th className="p-2">Total</th><th className="p-2">Payment</th>
+                                <th className="p-2">Request</th><th className="p-2"></th>
                             </tr>
                             </thead>
                             <tbody>
@@ -163,11 +159,12 @@ export default function BookingView() {
                                     <td className="p-2">{r.room_number} ({r.type})</td>
                                     <td className="p-2">{r.check_in}</td>
                                     <td className="p-2">{r.check_out}</td>
-                                    <td className="p-2">{r.status}</td>
+                                    <td className="p-2">{r.guests}</td>
+                                    <td className="p-2">{Number(r.total_price).toFixed(2)}</td>
+                                    <td className="p-2">{r.paid ? 'Paid' : 'Pay at hotel'}</td>
+                                    <td className="p-2">{r.special_request}</td>
                                     <td className="p-2 text-right">
-                                        {r.status === 'confirmed' && (
-                                            <button className="text-red-600 underline" onClick={() => cancel(r)}>Cancel</button>
-                                        )}
+                                        <button className="text-red-600 underline" onClick={() => cancel(r)}>Cancel</button>
                                     </td>
                                 </tr>
                             ))}
@@ -176,6 +173,24 @@ export default function BookingView() {
                     </div>
                 )}
             </section>
+
+            {bookingRoom && (
+                <BookingDialog
+                    room={bookingRoom}
+                    token={token}
+                    initial={{ check_in: search.check_in, check_out: search.check_out, guests: search.guests }}
+                    onClose={() => setBookingRoom(null)}
+                    onBooked={async (msg) => {
+                        setBookingRoom(null)
+                        setMessage(msg)
+                        try {
+                            await Promise.all([loadReservations(), loadRooms(search)])
+                        } catch (err) {
+                            setError((err as Error).message)
+                        }
+                    }}
+                />
+            )}
         </div>
     )
 }
