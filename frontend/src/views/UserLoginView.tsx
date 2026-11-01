@@ -16,8 +16,8 @@ function UserLoginView() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Already logged in: go to the user page
-  if (user) return <Navigate to="/user" replace />
+  // Already logged in: admins go to the admin page, everyone else to the user page
+  if (user) return <Navigate to={user.role === 'admin' ? '/admin' : '/user'} replace />
 
   const updateForm = (event: ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [event.target.name]: event.target.value })
