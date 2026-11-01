@@ -12,11 +12,11 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 
 function Nav() {
     const { user, logout } = useAuth()
-
+//navbar
     return (
         <nav className="flex gap-4 bg-white p-4 shadow">
             <NavLink to="/" end className={linkClass}>Home</NavLink>
-            <NavLink to="/booking" className={linkClass}>Book a room</NavLink>
+            {user && <NavLink to="/booking" className={linkClass}>Book a room</NavLink>}
             {user && <NavLink to="/user" className={linkClass}>User</NavLink>}
             {user?.role === 'admin' && <NavLink to="/admin" className={linkClass}>Admin</NavLink>}
 
@@ -26,7 +26,7 @@ function Nav() {
                         Log out ({user.name})
                     </button>
                 ) : (
-                    <NavLink to="/login" className={linkClass}>Login / Register</NavLink>
+                    <NavLink to="/login" className={linkClass}>Login</NavLink>
                 )}
             </div>
         </nav>
@@ -41,6 +41,10 @@ export default function App() {
                     <Nav />
                     <main className="p-6">
                         <Routes>
+                            <Route path="/booking" element={<ProtectedRoute><BookingView /></ProtectedRoute>} />
+                            <Route path="/admin" element={<ProtectedRoute role="admin"><AdminView /></ProtectedRoute>} />
+                            <Route path="/booking" element={<ProtectedRoute><BookingView /></ProtectedRoute>} />
+                            <Route path="/admin" element={<ProtectedRoute role="admin"><AdminView /></ProtectedRoute>} />
                             <Route path="/" element={<HomeView />} />
                             <Route path="/login" element={<UserLoginView />} />
                             <Route path="/booking" element={<ProtectedRoute><BookingView /></ProtectedRoute>} />
