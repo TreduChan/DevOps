@@ -30,13 +30,38 @@ Follow these steps to set up and run the development environment on your machine
 
 ### 1. Clone the Repository
 ```
-cd DevOps/frontend
+git clone <repository-url>
+cd DevOps
+```
+### 2. Frontend
+```
+cd frontend
+npm install
+npm run dev
+```
+The frontend runs at http://localhost:xxxx
+
+# Backend
+
+### 1. Go to the backend folder
+```
+cd DevOps/backend
 ```
 ### 2. Install Dependencies
 ```
 npm install
 ```
-### 3. Start the Development Server
+### 3. get the `.env` file
+
+Super secret
+
+### 4. Start the Backend Server
 ```
-npm run dev
+node --env-file=.env server.js
 ```
+Requires Node !!!
+
+### Notes
+- Start the backend before using the frontend.
+- Works only in school network
+- Super secrets !!!

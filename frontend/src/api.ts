@@ -5,6 +5,8 @@ export type Room = {
   price_per_night: string | number
   capacity: number
   description: string | null
+  available_from: string | null
+  available_until: string | null
 }
 
 export async function api<T = unknown>(

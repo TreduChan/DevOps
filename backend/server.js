@@ -123,19 +123,23 @@ const validDate = (s) => typeof s === 'string' && DATE_RE.test(s) && !Number.isN
 // A stay overlaps if it starts before the new one ends and ends after the new one starts
 const OVERLAP = `b.status = 'confirmed' AND b.check_in < ? AND b.check_out > ?`;
 
-// Returns [room_number, type, price, capacity, description] or null if invalid
+// Returns [room_number, type, price, capacity, description, available_from, available_until] or null
 function parseRoom(body) {
-  const { room_number, type, price_per_night, capacity, description } = body || {};
+  const { room_number, type, price_per_night, capacity, description, available_from, available_until } = body || {};
   const price = Number(price_per_night);
   const cap = Number(capacity);
+  const from = available_from || null;
+  const until = available_until || null;
   if (
     typeof room_number !== 'string' || !room_number.trim() ||
     typeof type !== 'string' || !type.trim() ||
     !Number.isFinite(price) || price <= 0 ||
-    !Number.isInteger(cap) || cap < 1
+    !Number.isInteger(cap) || cap < 1 ||
+    (from && !validDate(from)) || (until && !validDate(until)) ||
+    (from && until && until <= from)
   ) return null;
   const desc = typeof description === 'string' && description.trim() ? description.trim() : null;
-  return [room_number.trim(), type.trim(), price, cap, desc];
+  return [room_number.trim(), type.trim(), price, cap, desc, from, until];
 }
 
 // ---------- rooms: admin add / update / delete ----------
@@ -146,7 +150,7 @@ app.post('/api/admin/rooms', requireAuth, requireAdmin, async (req, res) => {
   }
   try {
     const [result] = await pool.execute(
-      'INSERT INTO rooms (room_number, type, price_per_night, capacity, description) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO rooms (room_number, type, price_per_night, capacity, description, available_from, available_until) VALUES (?, ?, ?, ?, ?, ?, ?)',
       values
     );
     return res.status(201).json({ id: result.insertId });
@@ -162,7 +166,7 @@ app.put('/api/admin/rooms/:id', requireAuth, requireAdmin, async (req, res) => {
   if (!values) return res.status(400).json({ error: 'Invalid room data' });
   try {
     const [result] = await pool.execute(
-      'UPDATE rooms SET room_number = ?, type = ?, price_per_night = ?, capacity = ?, description = ? WHERE id = ?',
+      'UPDATE rooms SET room_number = ?, type = ?, price_per_night = ?, capacity = ?, description = ?, available_from = ?, available_until = ? WHERE id = ?',
       [...values, req.params.id]
     );
     if (result.affectedRows === 0) return res.status(404).json({ error: 'Room not found' });
@@ -210,11 +214,16 @@ app.get('/api/rooms', requireAuth, async (req, res) => {
     }
     where.push(`NOT EXISTS (SELECT 1 FROM bookings b WHERE b.room_id = r.id AND ${OVERLAP})`);
     params.push(check_out, check_in);
+    where.push('(r.available_from IS NULL OR r.available_from <= ?)');
+    params.push(check_in);
+    where.push('(r.available_until IS NULL OR r.available_until >= ?)');
+    params.push(check_out);
   }
 
   try {
     const [rows] = await pool.execute(
-      `SELECT r.id, r.room_number, r.type, r.price_per_night, r.capacity, r.description
+      `SELECT r.id, r.room_number, r.type, r.price_per_night, r.capacity, r.description,
+              r.available_from, r.available_until
        FROM rooms r ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
        ORDER BY r.room_number`,
       params
@@ -241,10 +250,21 @@ app.post('/api/bookings', requireAuth, async (req, res) => {
   try {
     await conn.beginTransaction();
     // Lock the room row so two people cannot book the same room at the same moment
-    const [rooms] = await conn.execute('SELECT id FROM rooms WHERE id = ? FOR UPDATE', [roomId]);
+    const [rooms] = await conn.execute(
+      'SELECT id, available_from, available_until FROM rooms WHERE id = ? FOR UPDATE',
+      [roomId]
+    );
     if (rooms.length === 0) {
       await conn.rollback();
       return res.status(404).json({ error: 'Room not found' });
+    }
+    const room = rooms[0];
+    if (
+      (room.available_from && check_in < room.available_from) ||
+      (room.available_until && check_out > room.available_until)
+    ) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Room is not available for those dates' });
     }
     const [clash] = await conn.execute(
       `SELECT b.id FROM bookings b WHERE b.room_id = ? AND ${OVERLAP}`,

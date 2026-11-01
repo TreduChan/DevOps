@@ -12,7 +12,7 @@ type Booking = {
     room_number: string
 }
 
-const emptyForm = { room_number: '', type: 'single', price_per_night: '', capacity: '', description: '' }
+const emptyForm = { room_number: '', type: 'single', price_per_night: '', capacity: '', description: '', available_from: '', available_until: '' }
 const input = 'w-full rounded border p-2'
 
 export default function AdminView() {
@@ -54,6 +54,8 @@ export default function AdminView() {
             price_per_night: String(r.price_per_night),
             capacity: String(r.capacity),
             description: r.description ?? '',
+            available_from: r.available_from ?? '',
+            available_until: r.available_until ?? '',
         })
         setError('')
         setMessage('')
@@ -120,6 +122,12 @@ export default function AdminView() {
                     <input className={input} name="price_per_night" type="number" min="0.01" step="0.01" placeholder="Price per night" value={form.price_per_night} onChange={change} required />
                     <input className={input} name="capacity" type="number" min="1" step="1" placeholder="Capacity (guests)" value={form.capacity} onChange={change} required />
                     <input className={`${input} sm:col-span-2`} name="description" placeholder="Description (optional)" value={form.description} onChange={change} />
+                    <label className="text-sm">Available from (first check-in)
+                        <input className={input} name="available_from" type="date" value={form.available_from} onChange={change} />
+                    </label>
+                    <label className="text-sm">Available until (last check-out)
+                        <input className={input} name="available_until" type="date" min={form.available_from || undefined} value={form.available_until} onChange={change} />
+                    </label>
                     <div className="flex gap-2 sm:col-span-2">
                         <button className="rounded bg-blue-600 px-4 py-2 text-white" type="submit">
                             {editingId ? 'Save changes' : 'Add room'}
@@ -143,7 +151,7 @@ export default function AdminView() {
                             <thead>
                             <tr className="border-b">
                                 <th className="p-2">Room</th><th className="p-2">Type</th><th className="p-2">Price/night</th>
-                                <th className="p-2">Guests</th><th className="p-2">Description</th><th className="p-2"></th>
+                                <th className="p-2">Guests</th><th className="p-2">Description</th><th className="p-2">Available</th><th className="p-2"></th>
                             </tr>
                             </thead>
                             <tbody>
@@ -154,6 +162,11 @@ export default function AdminView() {
                                     <td className="p-2">{Number(r.price_per_night).toFixed(2)}</td>
                                     <td className="p-2">{r.capacity}</td>
                                     <td className="p-2">{r.description}</td>
+                                    <td className="p-2">
+                                        {r.available_from || r.available_until
+                                            ? `${r.available_from ?? 'any'} to ${r.available_until ?? 'any'}`
+                                            : 'Always'}
+                                    </td>
                                     <td className="space-x-3 p-2 text-right">
                                         <button className="text-blue-600 underline" onClick={() => startEdit(r)}>Edit</button>
                                         <button className="text-red-600 underline" onClick={() => remove(r)}>Delete</button>
