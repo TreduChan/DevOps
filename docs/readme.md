@@ -28,6 +28,3 @@ A web app for booking hotel rooms. Guests can search for available rooms, book t
 
 - One shared GitHub repo, with the work split by area
 
-![Commit history](docs/images/commits.png)
-## Database
-![Database](docs/images/database.png)
