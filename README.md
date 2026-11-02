@@ -65,3 +65,66 @@ Requires Node !!!
 - Start the backend before using the frontend.
 - Works only in school network
 - Super secrets !!!
+
+
+## Database
+
+### Overview
+
+This repository contains the MariaDB database for the Hotel Reservation System project.
+
+The database is designed to manage hotel rooms, customers, user accounts and reservations. It is shared by the frontend and backend development teams.
+
+### Database Information
+
+Database name: hotel_reservation_db
+
+Database management system: MariaDB
+
+Database management tool: DBeaver
+
+###Database Structure
+
+The database currently contains six tables:
+
+Table       Description
+
+roles                 Stores user roles, such as Admin, Receptionist and Customer.
+
+users                 Stores user account and contact information.
+
+room_types            Stores room categories, such as Single, Double and Suite.
+
+rooms                 Stores hotel room information.
+
+reservation_statuses  Stores reservation statuses.
+
+reservations          Stores customer reservations and booking information.
+
+### Requirements
+
+To use and modify the database locally, install:
+
+MariaDB Server
+
+A database management tool (e.g. DBeaver, HeidiSQL or MySQL Workbench)
+  
+### Setup
+
+import the database into their own local MariaDB server.
+
+1. Install MariaDB Server.
+
+2. Install and open DBeaver.
+
+3. Create a connection to your local MariaDB server.
+
+4. Create a new database named hotel_reservation_db.
+
+5. Open the provided SQL database export file.
+
+6. Select hotel_reservation_db as the active database.
+
+7. Execute the SQL script.
+
+8. Refresh the database navigator
