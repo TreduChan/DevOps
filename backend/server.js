@@ -37,25 +37,7 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
-
-// Example protected routes
-app.get('/api/me', requireAuth, (req, res) => res.json(req.user));
-app.get('/api/admin/ping', requireAuth, requireAdmin, (req, res) => res.json({ ok: true }));
-
-// Create the users table if it does not exist yet
-async function createTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-                                       id INT AUTO_INCREMENT PRIMARY KEY,
-                                       name VARCHAR(255) NOT NULL,
-      email VARCHAR(255) NOT NULL UNIQUE,
-      password_hash VARCHAR(255) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  `);
-}
-
-// Register a new user
+// Register a new user!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 app.post('/api/register', async (req, res) => {
   const { name, email, password } = req.body || {};
 
@@ -193,7 +175,6 @@ app.delete('/api/admin/rooms/:id', requireAuth, requireAdmin, async (req, res) =
 });
 
 // ---------- rooms: list and search (any logged-in user) ----------
-// Optional filters: ?check_in=YYYY-MM-DD&check_out=YYYY-MM-DD&guests=2&type=double
 app.get('/api/rooms', requireAuth, async (req, res) => {
   const { check_in, check_out, guests, type } = req.query;
   const where = [];
@@ -394,7 +375,8 @@ app.use((err, req, res, next) => {
   res.status(400).json({ error: 'Invalid request' });
 });
 
-createTable()
+// Check that the database is reachable, then start the server
+pool.query('SELECT 1')
     .then(() => app.listen(port, () => console.log(`Server running on port ${port}`)))
     .catch((error) => {
       console.error('Could not start server:', error.message);
