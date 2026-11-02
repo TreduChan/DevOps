@@ -98,6 +98,19 @@ Table       Description
 | `reservation_statuses` | Stores reservation statuses. |
 | `reservations` | Stores customer reservations and booking information. |
 
+### Database Relationships
+
+The database uses the following relationships:
+
+| Relationship | Type | Description |
+|---|---|---|
+| `roles` → `users` | One-to-Many (1:N) | One role can belong to multiple users. |
+| `room_types` → `rooms` | One-to-Many (1:N) | One room type can be assigned to multiple rooms. |
+| `users` → `reservations` (`customer_id`) | One-to-Many (1:N) | One customer can make multiple reservations. |
+| `users` → `reservations` (`handled_by`) | One-to-Many (1:N) | One receptionist can handle multiple reservations. |
+| `rooms` → `reservations` | One-to-Many (1:N) | One room can have multiple reservations over time. |
+| `reservation_statuses` → `reservations` | One-to-Many (1:N) | One reservation status can be assigned to multiple reservations. |
+
 ### Requirements
 
 To use and modify the database locally, install:
