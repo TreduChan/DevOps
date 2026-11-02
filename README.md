@@ -83,7 +83,7 @@ Database management system: MariaDB
 
 Database management tool: DBeaver
 
-###Database Structure
+### Database Structure
 
 The database currently contains six tables:
 
