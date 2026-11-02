@@ -89,17 +89,14 @@ The database currently contains six tables:
 
 Table       Description
 
-roles                 Stores user roles, such as Admin, Receptionist and Customer.
-
-users                 Stores user account and contact information.
-
-room_types            Stores room categories, such as Single, Double and Suite.
-
-rooms                 Stores hotel room information.
-
-reservation_statuses  Stores reservation statuses.
-
-reservations          Stores customer reservations and booking information.
+| Table | Description |
+|---|---|
+| `roles` | Stores user roles, such as Admin, Receptionist and Customer. |
+| `users` | Stores user account and contact information. |
+| `room_types` | Stores room categories, such as Single, Double and Suite. |
+| `rooms` | Stores hotel room information. |
+| `reservation_statuses` | Stores reservation statuses. |
+| `reservations` | Stores customer reservations and booking information. |
 
 ### Requirements
 
