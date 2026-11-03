@@ -99,29 +99,10 @@ app.post('/api/login', async (req, res) => {
 });
 
 // ---------- helpers ----------
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const { validDate, nightsBetween, totalPrice, parseRoom } = require('./utils');
+
 // A stay overlaps if it starts before the new one ends and ends after the new one starts
 const OVERLAP = `b.status = 'confirmed' AND b.check_in < ? AND b.check_out > ?`;
-
-// Returns [room_number, type, price, capacity, description, available_from, available_until] or null
-function parseRoom(body) {
-  const { room_number, type, price_per_night, capacity, description, available_from, available_until } = body || {};
-  const price = Number(price_per_night);
-  const cap = Number(capacity);
-  const from = available_from || null;
-  const until = available_until || null;
-  if (
-    typeof room_number !== 'string' || !room_number.trim() ||
-    typeof type !== 'string' || !type.trim() ||
-    !Number.isFinite(price) || price <= 0 ||
-    !Number.isInteger(cap) || cap < 1 ||
-    (from && !validDate(from)) || (until && !validDate(until)) ||
-    (from && until && until <= from)
-  ) return null;
-  const desc = typeof description === 'string' && description.trim() ? description.trim() : null;
-  return [room_number.trim(), type.trim(), price, cap, desc, from, until];
-}
 
 // ---------- rooms: admin add / update / delete ----------
 app.post('/api/admin/rooms', requireAuth, requireAdmin, async (req, res) => {
