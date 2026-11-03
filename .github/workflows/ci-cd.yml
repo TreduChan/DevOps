@@ -1,0 +1,226 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  # BUILD
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+
+      - name: Check Node version
+        run: |
+          node --version
+          npm --version
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install backend and check syntax
+        working-directory: backend
+        run: |
+          npm ci
+          find . -name '*.js' -not -path './node_modules/*' -exec node --check {} \;
+
+  # TEST
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+
+      # --if-present: runs only when a "test" script exists in package.json
+      - name: Test frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test --if-present
+
+      # Backend tests that use the database would also need the mariadb service from the Run job
+      - name: Test backend
+        working-directory: backend
+        run: |
+          npm ci
+          npm test --if-present
+
+  # PACKAGE
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Assemble release folder
+        run: |
+          mkdir -p release/backend release/frontend
+          rsync -a --exclude node_modules --exclude .env --exclude tests backend/ release/backend/
+          cp -r frontend/dist release/frontend/dist
+
+      - name: List release folder
+        run: |
+          ls -la release
+          ls -la release/backend
+
+      - name: Upload release
+        uses: actions/upload-artifact@v7
+        with:
+          name: hotel-booking-release
+          path: release/
+
+  # RUN
+  run:
+    name: Run application
+    runs-on: ubuntu-latest
+    needs: package
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: hotel
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download release
+        uses: actions/download-artifact@v8
+        with:
+          name: hotel-booking-release
+          path: release
+
+      - name: List release files
+        run: |
+          ls -la release
+          ls -la release/backend
+
+      - name: Create database tables
+        run: mysql --protocol=tcp -h 127.0.0.1 -P 3306 -u root -proot hotel < release/backend/schema.sql
+
+      - name: Install backend dependencies
+        working-directory: release/backend
+        run: npm ci --omit=dev
+
+      - name: Run application and smoke test
+        working-directory: release/backend
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: hotel
+          JWT_SECRET: ci-test-secret
+        run: |
+          node server.js > server.log 2>&1 &
+          SERVER_PID=$!
+          BASE=http://localhost:3000
+
+          # Wait until the server answers (any HTTP status means it is up)
+          for i in $(seq 1 30); do
+            curl -s -o /dev/null "$BASE/api/rooms" && break
+            sleep 1
+          done
+
+          check() {
+            code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE$2" -H 'Content-Type: application/json' -d "$3")
+            echo "$1: expected $4, got $code"
+            [ "$code" = "$4" ]
+          }
+
+          check "Register" /api/register '{"name":"CI User","email":"ci@example.com","password":"secret123"}' 201
+          check "Login with correct password" /api/login '{"email":"ci@example.com","password":"secret123"}' 200
+          check "Login with wrong password" /api/login '{"email":"ci@example.com","password":"wrongpass1"}' 401
+
+          echo "Smoke tests passed"
+          kill $SERVER_PID
+
+      - name: Show server log
+        if: failure()
+        working-directory: release/backend
+        run: cat server.log
+
+  # DEPLOY
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: run
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+    steps:
+      - name: Download release
+        uses: actions/download-artifact@v8
+        with:
+          name: hotel-booking-release
+          path: release
+
+      - name: List deployment package
+        run: |
+          ls -la release
+
+      - name: Deployment placeholder
+        run: |
+          echo "DEPLOYMENT STAGE"
+          echo "The hotel booking system has been successfully built, tested and packaged."
+          echo "The release folder is ready for deployment."

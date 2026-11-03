@@ -58,8 +58,8 @@ app.post('/api/register', async (req, res) => {
   try {
     const hash = await bcrypt.hash(password, 10);
     const [result] = await pool.execute(
-        'INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)',
-        [cleanName, cleanEmail, hash]
+      'INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)',
+      [cleanName, cleanEmail, hash]
     );
     return res.status(201).json({ id: result.insertId, name: cleanName, email: cleanEmail });
   } catch (error) {
@@ -81,8 +81,8 @@ app.post('/api/login', async (req, res) => {
 
   try {
     const [rows] = await pool.execute(
-        'SELECT id, name, email, role, password_hash FROM users WHERE email = ?',
-        [email.trim().toLowerCase()]
+      'SELECT id, name, email, role, password_hash FROM users WHERE email = ?',
+      [email.trim().toLowerCase()]
     );
     const user = rows[0];
 
@@ -100,8 +100,7 @@ app.post('/api/login', async (req, res) => {
 
 // ---------- helpers ----------
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const validDate = (s) => typeof s === 'string' && DATE_RE.test(s) && !Number.isNaN(Date.parse(s));
-
+const { validDate, nightsBetween, totalPrice, parseRoom } = require('./utils');
 // A stay overlaps if it starts before the new one ends and ends after the new one starts
 const OVERLAP = `b.status = 'confirmed' AND b.check_in < ? AND b.check_out > ?`;
 
@@ -293,8 +292,8 @@ app.post('/api/bookings', requireAuth, async (req, res) => {
       await conn.rollback();
       return res.status(409).json({ error: 'Room is not available for those dates' });
     }
-    const nights = Math.round((Date.parse(check_out) - Date.parse(check_in)) / 86400000);
-    const total = Math.round(nights * Number(room.price_per_night) * 100) / 100;
+    const nights = nightsBetween(check_in, check_out);
+    const total = totalPrice(nights, room.price_per_night);
     const paid = pay_now === true ? 1 : 0;
 
     const [result] = await conn.execute(
@@ -308,7 +307,7 @@ app.post('/api/bookings', requireAuth, async (req, res) => {
       guests: guestCount, total_price: total, paid: paid === 1, status: 'confirmed',
     });
   } catch (error) {
-    await conn.rollback().catch(() => {});
+    await conn.rollback().catch(() => { });
     console.error('Booking failed:', error.message);
     return res.status(500).json({ error: 'Could not make the booking' });
   } finally {
@@ -318,20 +317,20 @@ app.post('/api/bookings', requireAuth, async (req, res) => {
 
 // My reservations
 app.get('/api/bookings/mine', requireAuth, async (req, res) => {
-    try {
-      const [rows] = await pool.execute(
-        `SELECT b.id, b.check_in, b.check_out, b.status, b.guests, b.special_request, b.total_price, b.paid,
+  try {
+    const [rows] = await pool.execute(
+      `SELECT b.id, b.check_in, b.check_out, b.status, b.guests, b.special_request, b.total_price, b.paid,
                 r.room_number, r.type
          FROM bookings b JOIN rooms r ON r.id = b.room_id
          WHERE b.user_id = ? AND b.status = 'confirmed'
          ORDER BY b.check_in DESC`,
-        [req.user.id]
-      );
-      return res.json(rows);
-    } catch (error) {
-      console.error('My bookings failed:', error.message);
-      return res.status(500).json({ error: 'Could not load reservations' });
-    }
+      [req.user.id]
+    );
+    return res.json(rows);
+  } catch (error) {
+    console.error('My bookings failed:', error.message);
+    return res.status(500).json({ error: 'Could not load reservations' });
+  }
 });
 
 // Cancel = remove the booking. Allowed for the owner or an admin
@@ -377,8 +376,8 @@ app.use((err, req, res, next) => {
 
 // Check that the database is reachable, then start the server
 pool.query('SELECT 1')
-    .then(() => app.listen(port, () => console.log(`Server running on port ${port}`)))
-    .catch((error) => {
-      console.error('Could not start server:', error.message);
-      process.exit(1);
-    });
+  .then(() => app.listen(port, () => console.log(`Server running on port ${port}`)))
+  .catch((error) => {
+    console.error('Could not start server:', error.message);
+    process.exit(1);
+  });
