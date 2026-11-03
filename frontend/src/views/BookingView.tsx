@@ -62,7 +62,7 @@ export default function BookingView() {
             setError((err as Error).message)
         }
     }
-
+//cancel reservation
     const cancel = async (r: Reservation) => {
         if (!window.confirm(`Cancel your reservation for room ${r.room_number}?`)) return
         setError('')
@@ -173,7 +173,7 @@ export default function BookingView() {
                     </div>
                 )}
             </section>
-
+            
             {bookingRoom && (
                 <BookingDialog
                     room={bookingRoom}
