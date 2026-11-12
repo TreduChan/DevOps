@@ -28,3 +28,7 @@ A web app for booking hotel rooms. Guests can search for available rooms, book t
 
 - One shared GitHub repo, with the work split by area
 
+CI/CD:
+<img width="940" height="299" alt="image" src="https://github.com/user-attachments/assets/53a0711b-7e2a-46fb-bbba-66b247903c6b" />
+
+<img width="940" height="691" alt="image" src="https://github.com/user-attachments/assets/805ddc0a-57cf-4ac2-b477-6754fd40d15d" />
