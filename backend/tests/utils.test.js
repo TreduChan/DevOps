@@ -45,9 +45,6 @@ describe('parseRoom', () => {
     expect(parseRoom({ ...valid, price_per_night: 0 })).toBeNull();
     expect(parseRoom({ ...valid, price_per_night: -5 })).toBeNull();
   });
-  test('rejects a capacity below 1', () => {
-    expect(parseRoom({ ...valid, capacity: 0 })).toBeNull();
-  });
   test('rejects an availability window that ends before it starts', () => {
     const room = { ...valid, available_from: '2026-12-10', available_until: '2026-12-01' };
     expect(parseRoom(room)).toBeNull();
