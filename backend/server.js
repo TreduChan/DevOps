@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 
@@ -348,6 +349,13 @@ app.get('/api/admin/bookings', requireAuth, requireAdmin, async (req, res) => {
     console.error('List bookings failed:', error.message);
     return res.status(500).json({ error: 'Could not load bookings' });
   }
+});
+
+// Serve the built frontend (in the Docker image it is in ./public)
+const publicDir = path.join(__dirname, 'public');
+app.use(express.static(publicDir));
+app.get(/^\/(?!api\/).*/, (req, res, next) => {
+  res.sendFile(path.join(publicDir, 'index.html'), (err) => err && next());
 });
 
 // Bad JSON in a request returns JSON instead of an HTML error page

@@ -1,0 +1,112 @@
+# Defines the services (containers) that Docker Compose will manage.
+services:
+
+  # Defines the MariaDB database service.
+  db:
+
+    # Specifies the Docker image to use.
+    # Docker will download mariadb:11 if it is not already available locally.
+    image: mariadb:11.4
+
+    # Assigns a fixed name to the database container.
+    # We can use this name when referring to the container with Docker commands.
+    container_name: Hotel-room-database
+
+    # Defines environment variables used to configure MariaDB.
+    environment:
+
+      # Sets the password for the MariaDB root administrator account.
+      MARIADB_ROOT_PASSWORD: root_pass
+
+      # Creates a database named hotel when MariaDB is initialized for the first time.
+      MARIADB_DATABASE: hotel
+
+      # Creates a database user named hotel.
+      MARIADB_USER: hotel
+
+      # Sets the password for the hotel user.
+      MARIADB_PASSWORD: hotel-password
+
+    # Defines persistent storage for the database.
+    volumes:
+
+      # Maps the Docker volume mariadb_data to MariaDB's data directory.
+      # Database files remain available even if the container is removed.
+      - mariadb_data:/var/lib/mysql
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+
+    # Defines a health check to determine whether MariaDB is ready.
+    healthcheck:
+
+      # Specifies the command Docker executes to check database health.
+      test:
+
+        # Runs the health-check command inside the container.
+        - CMD
+
+        # MariaDB's built-in health-check script.
+        - healthcheck.sh
+
+        # Checks whether a connection to the database can be established.
+        - --connect
+
+        # Checks whether the InnoDB storage engine has finished initialization.
+        - --innodb_initialized
+
+      # Runs the health check every 5 seconds.
+      interval: 5s
+
+      # Allows each health-check execution a maximum of 5 seconds.
+      timeout: 5s
+
+      # Marks the container as unhealthy after 10 consecutive failed checks.
+      retries: 10
+
+  # Defines the application service (container).
+  room-app:
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    ports:
+      - "3000:3000"
+
+    # Provides database connection settings to the application.
+    environment:
+
+      # Database hostname.
+      # 'db' is the name of the MariaDB service defined above.
+      # Docker Compose provides internal DNS resolution for service names.
+      DB_HOST: db
+
+      # MariaDB's default port.
+      DB_PORT: 3306
+
+      # Name of the database the application will use.
+      DB_NAME: hotel
+
+      # Database username.
+      DB_USER: hotel
+
+      # Database password.
+      DB_PASSWORD: hotel-password
+
+      # Secret used to sign login tokens.
+      JWT_SECRET: ${JWT_SECRET:-development-secret}
+
+    # Defines dependencies between services.
+    depends_on:
+
+      # The application depends on the db service.
+      db:
+
+        # Starts the application only after the database passes its health check.
+        condition: service_healthy
+
+# Defines the named volumes used by the services.
+volumes:
+
+  # Declares the named volume mariadb_data.
+  # Docker manages the physical location of the volume.
+  mariadb_data:

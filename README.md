@@ -65,3 +65,17 @@ Requires Node !!!
 - Start the backend before using the frontend.
 - Works only in school network
 - Super secrets !!!
+
+## Run with Docker
+
+Docker Desktop is required. The Compose setup builds the application image,
+starts MariaDB, initializes the schema, and serves the application at
+http://localhost:3000.
+
+```powershell
+docker compose up --build
+```
+
+Stop the containers with `docker compose down`. See
+[docs/docker-report.md](docs/docker-report.md) for the Docker Hub workflow and
+the team participation report.
