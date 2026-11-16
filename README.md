@@ -66,16 +66,10 @@ Requires Node !!!
 - Works only in school network
 - Super secrets !!!
 
-## Run with Docker
+### Docker Hub
 
-Docker Desktop is required. The Compose setup builds the application image,
-starts MariaDB, initializes the schema, and serves the application at
-http://localhost:3000.
+Docker link: https://hub.docker.com/r/treduchan/hotel-app
 
 ```powershell
-docker compose up --build
+docker pull treduchan/hotel-app:latest
 ```
-
-Stop the containers with `docker compose down`. See
-[docs/docker-report.md](docs/docker-report.md) for the Docker Hub workflow and
-the team participation report.
