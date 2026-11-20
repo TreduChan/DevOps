@@ -1,4 +1,4 @@
-# Frontend only: React source + Vite dev server (no backend)
+# Frontend 
 FROM node:22-alpine
 
 WORKDIR /app/frontend
