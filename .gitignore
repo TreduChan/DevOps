@@ -49,3 +49,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Files copied out of the Docker image
+image_source_files/
