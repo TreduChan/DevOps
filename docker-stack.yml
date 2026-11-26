@@ -1,0 +1,40 @@
+# Docker Swarm stack: deployed by Jenkins with
+#   docker stack deploy -c docker-stack.yml hotel
+services:
+  db:
+    image: mariadb:11.4
+    environment:
+      MARIADB_ROOT_PASSWORD: root_pass
+      MARIADB_DATABASE: hotel
+      MARIADB_USER: hotel
+      MARIADB_PASSWORD: hotel-password
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    configs:
+      - source: schema
+        target: /docker-entrypoint-initdb.d/01-schema.sql
+
+  room-app:
+    image: treduchan/hotel-app:latest
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: hotel
+      DB_USER: hotel
+      DB_PASSWORD: hotel-password
+      JWT_SECRET: development-secret
+    deploy:
+      replicas: 1
+      # The app exits if the database is not ready yet, so Swarm restarts it
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+
+configs:
+  schema:
+    file: ./backend/schema.sql
+
+volumes:
+  mariadb_data:
